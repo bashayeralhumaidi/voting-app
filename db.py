@@ -3,8 +3,8 @@ import os
 
 def get_connection():
     return pymssql.connect(
-        server="voting01.database.windows.net",
-        user=os.environ["Julphar_Admin"],
-        password=os.environ["Bashayer01"],
-        database="Voting"
+        server=os.environ["DB_SERVER"],
+        user=os.environ["DB_USER"],
+        password=os.environ["DB_PASSWORD"],
+        database=os.environ["DB_NAME"]
     )
