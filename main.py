@@ -88,7 +88,7 @@ def login_user(req: LoginModel):
     cursor.execute("""
         SELECT username, password
         FROM dbo.Users
-        WHERE username = ?
+        WHERE username = %s
     """, (req.username,))
 
     row = cursor.fetchone()
@@ -137,7 +137,7 @@ def submit_vote(vote: VoteModel):
     cursor.execute("""
         INSERT INTO dbo.Voting
         (Idea_Title, Voting_By, Category, Score, Percentage)
-        VALUES (?, ?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s, %s)
     """, (
         vote.idea_title,
         vote.voted_by,
@@ -166,7 +166,7 @@ def get_results(idea_title: str):
     cursor.execute("""
         SELECT SUM(Percentage)
         FROM dbo.Voting
-        WHERE Idea_Title = ?
+        WHERE Idea_Title = %s
     """, (idea_title,))
 
     row = cursor.fetchone()
@@ -175,3 +175,4 @@ def get_results(idea_title: str):
     total = row[0] if row[0] else 0
 
     return {"total_percentage": total}
+
