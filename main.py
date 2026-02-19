@@ -26,7 +26,7 @@ app.add_middleware(
 class LoginModel(BaseModel):
     username: str
     password: str
-    names: str
+
 
 
 class VoteModel(BaseModel):
@@ -365,6 +365,7 @@ def change_password(data: ChangePasswordModel):
     conn.close()
 
     return {"success": True, "message": "Password changed successfully"}
+
 
 
 
