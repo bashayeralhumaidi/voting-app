@@ -9,7 +9,7 @@ app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:54581",
+        "http://localhost:52795",
         "https://green-forest-00c55ac03.4.azurestaticapps.net"
     ],
     allow_origin_regex=r"http://localhost:\d+",
@@ -365,6 +365,7 @@ def change_password(data: ChangePasswordModel):
     conn.close()
 
     return {"success": True, "message": "Password changed successfully"}
+
 
 
 
