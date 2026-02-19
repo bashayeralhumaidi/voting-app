@@ -371,7 +371,7 @@ def change_password(data: ChangePasswordModel):
     return {"success": True}
 
 # ==============================
-# Admin Full Report
+# Admin Full Report (Display Names)
 # ==============================
 
 @app.get("/admin/full_report")
@@ -382,12 +382,16 @@ def admin_full_report():
 
     # Get users (exclude Admin & bashayer)
     cursor.execute("""
-        SELECT username
+        SELECT username, names
         FROM dbo.Users
         WHERE username NOT IN ('Admin', 'bashayer')
     """)
-    users = [row[0] for row in cursor.fetchall()]
-    total_users = len(users)
+    
+    users_data = cursor.fetchall()
+
+    username_to_name = {row[0]: row[1] for row in users_data}
+    usernames = list(username_to_name.keys())
+    total_users = len(usernames)
 
     # Get all projects
     cursor.execute("""
@@ -408,19 +412,22 @@ def admin_full_report():
             WHERE Idea_Title = %s AND Submit = 1
         """, (project,))
 
-        voted_users = [row[0] for row in cursor.fetchall()]
-        not_voted_users = list(set(users) - set(voted_users))
+        voted_usernames = [row[0] for row in cursor.fetchall()]
+        not_voted_usernames = list(set(usernames) - set(voted_usernames))
 
-        completed = len(voted_users) == total_users
+        voted_names = [username_to_name[u] for u in voted_usernames if u in username_to_name]
+        not_voted_names = [username_to_name[u] for u in not_voted_usernames if u in username_to_name]
+
+        completed = len(voted_usernames) == total_users
         if completed:
             completed_projects += 1
 
         report.append({
             "project": project,
-            "total_voters": len(voted_users),
+            "total_voters": len(voted_usernames),
             "completed": completed,
-            "voted_users": voted_users,
-            "not_voted_users": not_voted_users
+            "voted_users": voted_names,
+            "not_voted_users": not_voted_names
         })
 
     conn.close()
@@ -431,5 +438,3 @@ def admin_full_report():
         "completed_projects": completed_projects,
         "projects": report
     }
-
-
