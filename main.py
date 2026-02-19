@@ -26,6 +26,7 @@ app.add_middleware(
 class LoginModel(BaseModel):
     username: str
     password: str
+    names: str
 
 
 class VoteModel(BaseModel):
@@ -46,6 +47,11 @@ class FinalVoteModel(BaseModel):
     idea_title: str
     percentage: float
     submit: bool
+
+class ChangePasswordModel(BaseModel):
+    username: str
+    old_password: str
+    new_password: str
 
 # ==============================
 # ROOT
@@ -300,6 +306,60 @@ def final_submit(data: dict):
     conn.close()
 
     return {"success": True}
+
+
+
+# ==============================
+# CHANGE PASSWORD ENDPOINT
+# ==============================
+@app.post("/change_password")
+def change_password(data: ChangePasswordModel):
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    # Get current password
+    cursor.execute("""
+        SELECT password
+        FROM dbo.Users
+        WHERE username = %s
+    """, (data.username,))
+
+    row = cursor.fetchone()
+
+    if not row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="User not found")
+
+    stored_password = row[0]
+
+    # Verify old password
+    if stored_password.startswith("$2"):
+        if not bcrypt.checkpw(data.old_password.encode(), stored_password.encode()):
+            conn.close()
+            raise HTTPException(status_code=401, detail="Old password incorrect")
+    else:
+        if stored_password != data.old_password:
+            conn.close()
+            raise HTTPException(status_code=401, detail="Old password incorrect")
+
+    # Encrypt new password
+    hashed_password = bcrypt.hashpw(
+        data.new_password.encode(),
+        bcrypt.gensalt()
+    ).decode()
+
+    # Update password
+    cursor.execute("""
+        UPDATE dbo.Users
+        SET password = %s
+        WHERE username = %s
+    """, (hashed_password, data.username))
+
+    conn.commit()
+    conn.close()
+
+    return {"success": True, "message": "Password changed successfully"}
 
 
 
