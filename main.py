@@ -9,13 +9,14 @@ app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:60020",
         "https://green-forest-00c55ac03.4.azurestaticapps.net"
     ],
+    allow_origin_regex=r"http://localhost:\d+",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 # ==============================
 # MODELS
@@ -178,6 +179,7 @@ def get_results(idea_title: str):
     total = row[0] if row[0] else 0
 
     return {"total_percentage": total}
+
 
 
 
