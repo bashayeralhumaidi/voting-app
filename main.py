@@ -116,18 +116,17 @@ def login_user(req: LoginModel):
 
     stored_password = row[1]
 
-    # ALWAYS treat stored password as bcrypt hash
+    # Ensure stored password is bytes
+    if isinstance(stored_password, str):
+        stored_password = stored_password.encode()
+
     try:
-        if bcrypt.checkpw(
-            req.password.encode(),
-            stored_password.encode()
-        ):
+        if bcrypt.checkpw(req.password.encode(), stored_password):
             return {"success": True, "username": row[0]}
         else:
             raise HTTPException(status_code=401, detail="Invalid credentials")
-    except:
-        # If stored password is not hashed properly
-        raise HTTPException(status_code=401, detail="Password format error")
+    except Exception:
+        raise HTTPException(status_code=401, detail="Password verification error")
 
 
 # ==============================
@@ -365,6 +364,7 @@ def change_password(data: ChangePasswordModel):
     conn.close()
 
     return {"success": True, "message": "Password changed successfully"}
+
 
 
 
