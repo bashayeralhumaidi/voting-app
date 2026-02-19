@@ -195,6 +195,29 @@ def submit_final_vote(data: FinalVoteModel):
 
     return {"success": True}
 
+# ==============================
+#  Disable the button
+# ==============================
+
+@app.get("/check_final_vote/{username}/{idea_title}")
+def check_final_vote(username: str, idea_title: str):
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT Submit
+        FROM dbo.FinalVoting
+        WHERE Username = %s AND Idea_Title = %s
+    """, (username, idea_title))
+
+    row = cursor.fetchone()
+    conn.close()
+
+    if row:
+        return {"submitted": bool(row[0])}
+
+    return {"submitted": False}
 
 
 
