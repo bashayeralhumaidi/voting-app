@@ -29,7 +29,7 @@ class LoginModel(BaseModel):
 
 class VoteModel(BaseModel):
     idea_title: str
-    voted_by: str
+    username: str
     category: str   # pillar name
     score: int      # 1-5
 
@@ -116,6 +116,7 @@ def login_user(req: LoginModel):
 # ==============================
 # SUBMIT VOTE
 # ==============================
+   
 @app.post("/submit_vote")
 def submit_vote(vote: VoteModel):
 
@@ -127,14 +128,13 @@ def submit_vote(vote: VoteModel):
 
     cursor.execute("""
         INSERT INTO dbo.Voting
-        (Idea_Title, username, Category, Score, Percentage)
-        VALUES (%s, %s, %s, %s, %s)
+        (Idea_Title, username, Category, Score)
+        VALUES (%s, %s, %s, %s)
     """, (
         vote.idea_title,
         vote.username,
         vote.category,
-        vote.score,
-        vote.percentage   # 👈 directly from frontend
+        vote.score
     ))
 
     conn.commit()
@@ -163,6 +163,7 @@ def get_results(idea_title: str):
     total = row[0] if row[0] else 0
 
     return {"total_percentage": total}
+
 
 
 
