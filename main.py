@@ -97,7 +97,7 @@ def get_initiatives():
 # USER LOGIN
 # ==============================
 
-    @app.post("/login")
+@app.post("/login")
 def login_user(req: LoginModel):
     conn = get_connection()
     cursor = conn.cursor()
@@ -365,6 +365,7 @@ def change_password(data: ChangePasswordModel):
     conn.close()
 
     return {"success": True, "message": "Password changed successfully"}
+
 
 
 
