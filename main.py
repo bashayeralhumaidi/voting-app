@@ -281,24 +281,7 @@ def admin_results():
         })
 
     return results
-@app.get("/check_final_vote/{username}/{title}")
-def check_final_vote(username: str, title: str):
-    conn = get_connection()
-    cursor = conn.cursor()
 
-    cursor.execute("""
-        SELECT Submit
-        FROM dbo.FinalVoting
-        WHERE Username = ? AND Idea_Title = ?
-    """, (username, title))
-
-    row = cursor.fetchone()
-    conn.close()
-
-    if row:
-        return {"submitted": row[0] == True}
-
-    return {"submitted": False}
 @app.post("/final_submit")
 def final_submit(data: dict):
     conn = get_connection()
@@ -317,6 +300,7 @@ def final_submit(data: dict):
     conn.close()
 
     return {"success": True}
+
 
 
 
