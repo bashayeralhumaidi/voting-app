@@ -370,6 +370,11 @@ def change_password(data: ChangePasswordModel):
 
     return {"success": True}
 
+
+# ==============================
+# Admin Full Report
+# ==============================
+
 @app.get("/admin/full_report")
 def admin_full_report():
 
@@ -382,7 +387,6 @@ def admin_full_report():
         FROM dbo.Users
         WHERE username NOT IN ('Admin', 'bashayer')
     """)
-    
     users_data = cursor.fetchall()
 
     username_to_name = {}
@@ -394,15 +398,26 @@ def admin_full_report():
 
     total_users = len(all_usernames)
 
-    # Get all projects
-    cursor.execute("SELECT AI_Initiative_Title FROM dbo.Initiative")
-    projects = [row[0] for row in cursor.fetchall()]
-    total_projects = len(projects)
+    # Get all projects with full details
+    cursor.execute("""
+        SELECT AI_Initiative_Title,
+               Summary_of_AI_Solution,
+               Business_Impact_Explanation,
+               FilePath
+        FROM dbo.Initiative
+    """)
+    projects_data = cursor.fetchall()
 
-    report = []
+    total_projects = len(projects_data)
     completed_projects = 0
+    report = []
 
-    for project in projects:
+    for row in projects_data:
+
+        project = row[0]
+        solution = row[1]
+        impact = row[2]
+        file_path = row[3]
 
         cursor.execute("""
             SELECT Username
@@ -410,10 +425,9 @@ def admin_full_report():
             WHERE Idea_Title = %s AND Submit = 1
         """, (project,))
 
-        voted_usernames = [row[0] for row in cursor.fetchall()]
+        voted_usernames = [r[0] for r in cursor.fetchall()]
         not_voted_usernames = list(set(all_usernames) - set(voted_usernames))
 
-        # 🔥 Convert usernames to names
         voted_names = [
             username_to_name[u]
             for u in voted_usernames
@@ -432,10 +446,13 @@ def admin_full_report():
 
         report.append({
             "project": project,
+            "solution": solution,
+            "impact": impact,
+            "file": file_path,
             "total_voters": len(voted_usernames),
             "completed": completed,
-            "voted_users": voted_names,          # <-- names only
-            "not_voted_users": not_voted_names   # <-- names only
+            "voted_users": voted_names,
+            "not_voted_users": not_voted_names
         })
 
     conn.close()
