@@ -122,41 +122,25 @@ def submit_vote(vote: VoteModel):
     if vote.score < 1 or vote.score > 5:
         raise HTTPException(status_code=400, detail="Score must be 1-5")
 
-    # Weights
-    weights = {
-        "Strategic Impact": 0.25,
-        "Feasibility & Practicality": 0.20,
-        "Innovation & Originality": 0.15,
-        "Financial & Value": 0.20,
-        "Proof of Concept Readiness": 0.20
-    }
-
-    weight = weights.get(vote.category, 0)
-
-    percentage = vote.score * weight * 20   # convert to %
-
     conn = get_connection()
     cursor = conn.cursor()
 
     cursor.execute("""
         INSERT INTO dbo.Voting
-        (Idea_Title, Voting_By, Category, Score, Percentage)
+        (Idea_Title, username, Category, Score, Percentage)
         VALUES (%s, %s, %s, %s, %s)
     """, (
         vote.idea_title,
-        vote.voted_by,
+        vote.username,
         vote.category,
         vote.score,
-        percentage
+        vote.percentage   # 👈 directly from frontend
     ))
 
     conn.commit()
     conn.close()
 
-    return {
-        "success": True,
-        "percentage": percentage
-    }
+    return {"success": True}
 
 
 # ==============================
@@ -179,6 +163,7 @@ def get_results(idea_title: str):
     total = row[0] if row[0] else 0
 
     return {"total_percentage": total}
+
 
 
 
