@@ -40,6 +40,11 @@ class InitiativeModel(BaseModel):
     impact: str
     file: str | None = None
 
+class FinalVoteModel(BaseModel):
+    username: str
+    idea_title: str
+    percentage: float
+    submit: bool
 
 # ==============================
 # ROOT
@@ -164,7 +169,31 @@ def get_results(idea_title: str):
 
     return {"total_percentage": total}
 
+# ==============================
+#  Final Vote
+# ==============================
 
+@app.post("/submit_final_vote")
+def submit_final_vote(data: FinalVoteModel):
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        INSERT INTO dbo.FinalVoting
+        (Username, Idea_Title, Percentage, Submit)
+        VALUES (%s, %s, %s, %s)
+    """, (
+        data.username,
+        data.idea_title,
+        data.percentage,
+        1 if data.submit else 0
+    ))
+
+    conn.commit()
+    conn.close()
+
+    return {"success": True}
 
 
 
