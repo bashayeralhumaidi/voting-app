@@ -316,13 +316,16 @@ def final_submit(data: dict):
 # ==============================
 # CHANGE PASSWORD ENDPOINT
 # ==============================
+# ==============================
+# CHANGE PASSWORD ENDPOINT
+# ==============================
 @app.post("/change_password")
 def change_password(data: ChangePasswordModel):
 
     conn = get_connection()
     cursor = conn.cursor()
 
-    # Get current password
+    # Get stored password
     cursor.execute("""
         SELECT password
         FROM dbo.Users
@@ -337,34 +340,36 @@ def change_password(data: ChangePasswordModel):
 
     stored_password = row[0]
 
-    # Verify old password
-    if stored_password.startswith("$2"):
-        if not bcrypt.checkpw(data.old_password.encode(), stored_password.encode()):
-            conn.close()
-            raise HTTPException(status_code=401, detail="Old password incorrect")
-    else:
-        if stored_password != data.old_password:
-            conn.close()
-            raise HTTPException(status_code=401, detail="Old password incorrect")
+    # Ensure stored password is bytes (safe for bcrypt)
+    if isinstance(stored_password, str):
+        stored_password = stored_password.encode()
 
-    # Encrypt new password
-    hashed_password = bcrypt.hashpw(
+    # Verify old password
+    try:
+        if not bcrypt.checkpw(data.old_password.encode(), stored_password):
+            conn.close()
+            raise HTTPException(status_code=401, detail="Old password incorrect")
+    except Exception:
+        conn.close()
+        raise HTTPException(status_code=500, detail="Password verification error")
+
+    # Hash new password
+    new_hashed_password = bcrypt.hashpw(
         data.new_password.encode(),
         bcrypt.gensalt()
-    ).decode()
+    )
 
-    # Update password
+    # Update password in database
     cursor.execute("""
         UPDATE dbo.Users
         SET password = %s
         WHERE username = %s
-    """, (hashed_password, data.username))
+    """, (new_hashed_password, data.username))
 
     conn.commit()
     conn.close()
 
     return {"success": True, "message": "Password changed successfully"}
-
 
 
 
