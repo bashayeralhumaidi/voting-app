@@ -107,7 +107,7 @@ def login_user(req: LoginModel):
         SELECT username, password
         FROM dbo.Users
         WHERE username = %s
-    """, (req.username,))
+    """, (req.username.strip(),))
 
     row = cursor.fetchone()
     conn.close()
@@ -115,23 +115,21 @@ def login_user(req: LoginModel):
     if not row:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    stored_password = row[1]
+    stored = row[1].strip()
+    input_password = req.password.strip()
 
-    # Convert bytes to string if needed
-    if isinstance(stored_password, bytes):
-        stored_password = stored_password.decode()
+    def is_hashed(p):
+        return p.startswith("$2a$") or p.startswith("$2b$")
 
-    # CASE 1: Already encrypted (bcrypt)
-    if stored_password.startswith("$2"):
-        if not bcrypt.checkpw(req.password.encode(), stored_password.encode()):
+    if is_hashed(stored):
+        if not bcrypt.checkpw(input_password.encode(), stored.encode()):
             raise HTTPException(status_code=401, detail="Invalid credentials")
-
-    # CASE 2: Plain text (first login)
     else:
-        if stored_password != req.password:
+        if stored != input_password:
             raise HTTPException(status_code=401, detail="Invalid credentials")
 
     return {"success": True, "username": row[0]}
+
 
 
 # ==============================
@@ -321,9 +319,7 @@ def final_submit(data: dict):
 # ==============================
 # CHANGE PASSWORD ENDPOINT
 # ==============================
-# ==============================
-# CHANGE PASSWORD ENDPOINT
-# ==============================
+
 @app.post("/change_password")
 def change_password(data: ChangePasswordModel):
 
@@ -373,3 +369,4 @@ def change_password(data: ChangePasswordModel):
     conn.close()
 
     return {"success": True}
+
