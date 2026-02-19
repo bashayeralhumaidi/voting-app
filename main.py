@@ -221,3 +221,93 @@ def check_final_vote(username: str, idea_title: str):
 
 
 
+@app.get("/admin/summary")
+def admin_summary():
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT
+            COUNT(DISTINCT Idea_Title) AS total_initiatives,
+            COUNT(*) AS total_votes,
+            SUM(CASE WHEN Submit = 1 THEN 1 ELSE 0 END) AS submitted,
+            ISNULL(CAST(AVG(Percentage) AS INT), 0) AS avg_percentage
+        FROM dbo.FinalVoting
+    """)
+
+    row = cursor.fetchone()
+    conn.close()
+
+    return {
+        "total_initiatives": row[0],
+        "total_votes": row[1],
+        "submitted": row[2],
+        "avg_percentage": row[3]
+    }
+@app.get("/admin/results")
+def admin_results():
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT
+            ROW_NUMBER() OVER (ORDER BY AVG(Percentage) DESC) AS rank,
+            Idea_Title,
+            COUNT(*) AS votes,
+            CAST(AVG(Percentage) AS INT) AS average_percentage
+        FROM dbo.FinalVoting
+        WHERE Submit = 1
+        GROUP BY Idea_Title
+        ORDER BY average_percentage DESC
+    """)
+
+    rows = cursor.fetchall()
+    conn.close()
+
+    results = []
+    for row in rows:
+        results.append({
+            "rank": row[0],
+            "title": row[1],
+            "votes": row[2],
+            "average_percentage": row[3]
+        })
+
+    return results
+@app.get("/check_final_vote/{username}/{title}")
+def check_final_vote(username: str, title: str):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT Submit
+        FROM dbo.FinalVoting
+        WHERE Username = ? AND Idea_Title = ?
+    """, (username, title))
+
+    row = cursor.fetchone()
+    conn.close()
+
+    if row:
+        return {"submitted": row[0] == True}
+
+    return {"submitted": False}
+@app.post("/final_submit")
+def final_submit(data: dict):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        INSERT INTO dbo.FinalVoting (Username, Idea_Title, Percentage, Submit)
+        VALUES (?, ?, ?, 1)
+    """, (
+        data["username"],
+        data["idea_title"],
+        data["percentage"]
+    ))
+
+    conn.commit()
+    conn.close()
+
+    return {"success": True}
+
