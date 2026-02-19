@@ -220,30 +220,36 @@ def check_final_vote(username: str, idea_title: str):
     return {"submitted": False}
 
 
-
 @app.get("/admin/summary")
 def admin_summary():
     conn = get_connection()
     cursor = conn.cursor()
 
-    cursor.execute("""
-        SELECT
-            COUNT(DISTINCT Idea_Title) AS total_initiatives,
-            COUNT(*) AS total_votes,
-            SUM(CASE WHEN Submit = 1 THEN 1 ELSE 0 END) AS submitted,
-            ISNULL(CAST(AVG(Percentage) AS INT), 0) AS avg_percentage
-        FROM dbo.FinalVoting
-    """)
+    # Total initiatives from Initiative table
+    cursor.execute("SELECT COUNT(*) FROM dbo.Initiative")
+    total_initiatives = cursor.fetchone()[0]
 
-    row = cursor.fetchone()
+    # Total votes from FinalVoting table
+    cursor.execute("SELECT COUNT(*) FROM dbo.FinalVoting")
+    total_votes = cursor.fetchone()[0]
+
+    # Submitted votes
+    cursor.execute("SELECT COUNT(*) FROM dbo.FinalVoting WHERE Submit = 1")
+    submitted = cursor.fetchone()[0]
+
+    # Average percentage
+    cursor.execute("SELECT ISNULL(AVG(Percentage),0) FROM dbo.FinalVoting")
+    avg_percentage = round(cursor.fetchone()[0], 2)
+
     conn.close()
 
     return {
-        "total_initiatives": row[0],
-        "total_votes": row[1],
-        "submitted": row[2],
-        "avg_percentage": row[3]
+        "total_initiatives": total_initiatives,
+        "total_votes": total_votes,
+        "submitted": submitted,
+        "avg_percentage": avg_percentage
     }
+
 @app.get("/admin/results")
 def admin_results():
     conn = get_connection()
@@ -310,4 +316,5 @@ def final_submit(data: dict):
     conn.close()
 
     return {"success": True}
+
 
