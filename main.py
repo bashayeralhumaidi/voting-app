@@ -96,7 +96,8 @@ def get_initiatives():
 # ==============================
 # USER LOGIN
 # ==============================
-@app.post("/login")
+
+    @app.post("/login")
 def login_user(req: LoginModel):
     conn = get_connection()
     cursor = conn.cursor()
@@ -115,14 +116,18 @@ def login_user(req: LoginModel):
 
     stored_password = row[1]
 
-    if stored_password.startswith("$2"):
-        if not bcrypt.checkpw(req.password.encode(), stored_password.encode()):
+    # ALWAYS treat stored password as bcrypt hash
+    try:
+        if bcrypt.checkpw(
+            req.password.encode(),
+            stored_password.encode()
+        ):
+            return {"success": True, "username": row[0]}
+        else:
             raise HTTPException(status_code=401, detail="Invalid credentials")
-    else:
-        if stored_password != req.password:
-            raise HTTPException(status_code=401, detail="Invalid credentials")
-
-    return {"success": True, "username": row[0]}
+    except:
+        # If stored password is not hashed properly
+        raise HTTPException(status_code=401, detail="Password format error")
 
 
 # ==============================
@@ -360,6 +365,7 @@ def change_password(data: ChangePasswordModel):
     conn.close()
 
     return {"success": True, "message": "Password changed successfully"}
+
 
 
 
