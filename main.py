@@ -9,6 +9,7 @@ app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
+        "http://localhost:55156",
         "https://green-forest-00c55ac03.4.azurestaticapps.net"
     ],
     allow_origin_regex=r"http://localhost:\d+",
@@ -316,5 +317,6 @@ def final_submit(data: dict):
     conn.close()
 
     return {"success": True}
+
 
 
