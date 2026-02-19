@@ -99,6 +99,7 @@ def get_initiatives():
 
 @app.post("/login")
 def login_user(req: LoginModel):
+
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -116,17 +117,21 @@ def login_user(req: LoginModel):
 
     stored_password = row[1]
 
-    # Ensure stored password is bytes
-    if isinstance(stored_password, str):
-        stored_password = stored_password.encode()
+    # Convert bytes to string if needed
+    if isinstance(stored_password, bytes):
+        stored_password = stored_password.decode()
 
-    try:
-        if bcrypt.checkpw(req.password.encode(), stored_password):
-            return {"success": True, "username": row[0]}
-        else:
+    # CASE 1: Already encrypted (bcrypt)
+    if stored_password.startswith("$2"):
+        if not bcrypt.checkpw(req.password.encode(), stored_password.encode()):
             raise HTTPException(status_code=401, detail="Invalid credentials")
-    except Exception:
-        raise HTTPException(status_code=401, detail="Password verification error")
+
+    # CASE 2: Plain text (first login)
+    else:
+        if stored_password != req.password:
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    return {"success": True, "username": row[0]}
 
 
 # ==============================
@@ -325,7 +330,6 @@ def change_password(data: ChangePasswordModel):
     conn = get_connection()
     cursor = conn.cursor()
 
-    # Get stored password
     cursor.execute("""
         SELECT password
         FROM dbo.Users
@@ -340,42 +344,32 @@ def change_password(data: ChangePasswordModel):
 
     stored_password = row[0]
 
-    # Ensure stored password is bytes (safe for bcrypt)
-    if isinstance(stored_password, str):
-        stored_password = stored_password.encode()
+    if isinstance(stored_password, bytes):
+        stored_password = stored_password.decode()
 
     # Verify old password
-    try:
-        if not bcrypt.checkpw(data.old_password.encode(), stored_password):
+    if stored_password.startswith("$2"):
+        if not bcrypt.checkpw(data.old_password.encode(), stored_password.encode()):
             conn.close()
             raise HTTPException(status_code=401, detail="Old password incorrect")
-    except Exception:
-        conn.close()
-        raise HTTPException(status_code=500, detail="Password verification error")
+    else:
+        if stored_password != data.old_password:
+            conn.close()
+            raise HTTPException(status_code=401, detail="Old password incorrect")
 
-    # Hash new password
-    new_hashed_password = bcrypt.hashpw(
+    # Encrypt new password
+    new_hash = bcrypt.hashpw(
         data.new_password.encode(),
         bcrypt.gensalt()
-    )
+    ).decode()
 
-    # Update password in database
     cursor.execute("""
         UPDATE dbo.Users
         SET password = %s
         WHERE username = %s
-    """, (new_hashed_password, data.username))
+    """, (new_hash, data.username))
 
     conn.commit()
     conn.close()
 
-    return {"success": True, "message": "Password changed successfully"}
-
-
-
-
-
-
-
-
-
+    return {"success": True}
