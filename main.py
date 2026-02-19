@@ -371,7 +371,7 @@ def change_password(data: ChangePasswordModel):
     return {"success": True}
 
 # ==============================
-# Admin
+# Admin Full Report
 # ==============================
 
 @app.get("/admin/full_report")
@@ -380,7 +380,7 @@ def admin_full_report():
     conn = get_connection()
     cursor = conn.cursor()
 
-    # Get total users excluding admin + bashayer
+    # Get users (exclude Admin & bashayer)
     cursor.execute("""
         SELECT username
         FROM dbo.Users
@@ -390,10 +390,15 @@ def admin_full_report():
     total_users = len(users)
 
     # Get all projects
-    cursor.execute("SELECT AI_Initiative_Title FROM dbo.Initiative")
+    cursor.execute("""
+        SELECT AI_Initiative_Title
+        FROM dbo.Initiative
+    """)
     projects = [row[0] for row in cursor.fetchall()]
+    total_projects = len(projects)
 
     report = []
+    completed_projects = 0
 
     for project in projects:
 
@@ -404,22 +409,27 @@ def admin_full_report():
         """, (project,))
 
         voted_users = [row[0] for row in cursor.fetchall()]
+        not_voted_users = list(set(users) - set(voted_users))
 
-        not_voted = list(set(users) - set(voted_users))
+        completed = len(voted_users) == total_users
+        if completed:
+            completed_projects += 1
 
         report.append({
             "project": project,
             "total_voters": len(voted_users),
-            "completed": len(voted_users) == total_users,
+            "completed": completed,
             "voted_users": voted_users,
-            "not_voted_users": not_voted
+            "not_voted_users": not_voted_users
         })
 
     conn.close()
 
     return {
         "total_users": total_users,
-        "total_projects": len(projects),
+        "total_projects": total_projects,
+        "completed_projects": completed_projects,
         "projects": report
     }
+
 
