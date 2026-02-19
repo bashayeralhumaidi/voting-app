@@ -302,7 +302,7 @@ def final_submit(data: dict):
 
     cursor.execute("""
         INSERT INTO dbo.FinalVoting (Username, Idea_Title, Percentage, Submit)
-        VALUES (?, ?, ?, 1)
+        VALUES (%s, %s, %s, 1)
     """, (
         data["username"],
         data["idea_title"],
@@ -422,3 +422,4 @@ def admin_full_report():
         "total_projects": len(projects),
         "projects": report
     }
+
