@@ -374,92 +374,59 @@ def change_password(data: ChangePasswordModel):
 # ==============================
 # Admin Full Report
 # ==============================
-
 @app.get("/admin/full_report")
 def admin_full_report():
 
     conn = get_connection()
     cursor = conn.cursor()
 
-    # Get users (exclude Admin & bashayer)
+    # ===== TOTAL PROJECTS =====
+    cursor.execute("SELECT COUNT(*) FROM Initiative")
+    total_projects = cursor.fetchone()[0]
+
+    # ===== COMPLETED PROJECTS =====
+    cursor.execute("SELECT COUNT(DISTINCT idea_title) FROM Voting")
+    completed_projects = cursor.fetchone()[0]
+
+    # ===== TOTAL USERS =====
+    cursor.execute("SELECT COUNT(*) FROM Users")
+    total_users = cursor.fetchone()[0]
+
+    # ===== TOTAL TEAMS =====
     cursor.execute("""
-        SELECT username, names
-        FROM dbo.Users
-        WHERE username NOT IN ('Admin', 'bashayer')
+        SELECT COUNT(DISTINCT Team)
+        FROM Initiative
+        WHERE Team IS NOT NULL AND Team <> ''
     """)
-    users_data = cursor.fetchall()
+    total_teams = cursor.fetchone()[0]
 
-    username_to_name = {}
-    all_usernames = []
-
-    for row in users_data:
-        username_to_name[row[0]] = row[1]
-        all_usernames.append(row[0])
-
-    total_users = len(all_usernames)
-
-    # Get all projects with full details
+    # ===== INDIVIDUAL IDEAS =====
     cursor.execute("""
-        SELECT AI_Initiative_Title,
-               Summary_of_AI_Solution,
-               Business_Impact_Explanation,
-               FilePath
-        FROM dbo.Initiative
+        SELECT COUNT(*)
+        FROM Initiative
+        WHERE Team IS NULL OR Team = ''
     """)
-    projects_data = cursor.fetchall()
+    individual_ideas = cursor.fetchone()[0]
 
-    total_projects = len(projects_data)
-    completed_projects = 0
-    report = []
-
-    for row in projects_data:
-
-        project = row[0]
-        solution = row[1]
-        impact = row[2]
-        file_path = row[3]
-
-        cursor.execute("""
-            SELECT Username
-            FROM dbo.FinalVoting
-            WHERE Idea_Title = %s AND Submit = 1
-        """, (project,))
-
-        voted_usernames = [r[0] for r in cursor.fetchall()]
-        not_voted_usernames = list(set(all_usernames) - set(voted_usernames))
-
-        voted_names = [
-            username_to_name[u]
-            for u in voted_usernames
-            if u in username_to_name
-        ]
-
-        not_voted_names = [
-            username_to_name[u]
-            for u in not_voted_usernames
-            if u in username_to_name
-        ]
-
-        completed = len(voted_usernames) == total_users
-        if completed:
-            completed_projects += 1
-
-        report.append({
-            "project": project,
-            "solution": solution,
-            "impact": impact,
-            "file": file_path,
-            "total_voters": len(voted_usernames),
-            "completed": completed,
-            "voted_users": voted_names,
-            "not_voted_users": not_voted_names
-        })
+    # ===== COUNTRY DISTRIBUTION =====
+    cursor.execute("""
+        SELECT Country, COUNT(*) as total
+        FROM Initiative
+        WHERE Country IS NOT NULL AND Country <> ''
+        GROUP BY Country
+    """)
+    country_data = [
+        {"country": row[0], "count": row[1]}
+        for row in cursor.fetchall()
+    ]
 
     conn.close()
 
     return {
-        "total_users": total_users,
         "total_projects": total_projects,
         "completed_projects": completed_projects,
-        "projects": report
+        "total_users": total_users,
+        "total_teams": total_teams,
+        "individual_ideas": individual_ideas,
+        "country_distribution": country_data,
     }
