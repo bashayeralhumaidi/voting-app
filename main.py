@@ -381,8 +381,8 @@ def admin_full_report():
     cursor = conn.cursor()
 
     # ================= TOTAL PROJECTS (FIXED 39) =================
-    total_projects = 39
-
+    cursor.execute("SELECT COUNT(*) FROM dbo.Initiative")
+    total_projects = cursor.fetchone()[0] or 0
     # ================= COMPLETED PROJECTS =================
     cursor.execute("SELECT COUNT(DISTINCT Idea_Title) FROM dbo.FinalVoting WHERE Submit = 1")
     completed_projects = cursor.fetchone()[0] or 0
@@ -485,3 +485,4 @@ def admin_full_report():
         "projects": projects,
         "users_summary": users_summary
     }
+
