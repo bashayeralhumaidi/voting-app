@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from db import get_connection
 import bcrypt
+import sys
 
 app = FastAPI()
 
@@ -17,6 +18,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+sys.setdefaultencoding = "utf-8"
 
 
 # ==============================
@@ -528,5 +530,6 @@ def admin_full_report():
         "projects": projects,
         "users_summary": users_summary
     }
+
 
 
