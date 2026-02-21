@@ -480,7 +480,8 @@ def admin_full_report():
         cursor.execute("""
             SELECT Username, Percentage
             FROM dbo.FinalVoting
-            WHERE Idea_Title = %s AND Submit = 1
+            WHERE LTRIM(RTRIM(Idea_Title)) = LTRIM(RTRIM(%s))
+              AND Submit = 1
         """, (title,))
     
         voted_data = cursor.fetchall()
@@ -527,4 +528,5 @@ def admin_full_report():
         "projects": projects,
         "users_summary": users_summary
     }
+
 
