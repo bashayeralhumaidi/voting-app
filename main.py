@@ -374,6 +374,7 @@ def change_password(data: ChangePasswordModel):
 # ==============================
 # Admin Full Report
 # ==============================
+
 @app.get("/admin/full_report")
 def admin_full_report():
 
@@ -423,62 +424,27 @@ def admin_full_report():
             "count": int(row[1])
         })
 
-    # ================= PROJECT STATUS =================
-    cursor.execute("SELECT username FROM dbo.Users")
-    all_users = [row[0] for row in cursor.fetchall() if row[0] is not None]
-
-    cursor.execute("""
-        SELECT AI_Initiative_Title,
-               Summary_of_AI_Solution,
-               Business_Impact_Explanation,
-               FilePath
-        FROM dbo.Initiative
-    """)
-
-    initiatives = cursor.fetchall()
-
-    projects = []
-
-    for title, solution, impact, file_path in initiatives:
-
-        cursor.execute("""
-            SELECT Username
-            FROM dbo.FinalVoting
-            WHERE Idea_Title = %s AND Submit = 1
-        """, (title,))
-
-        voted_users = [r[0] for r in cursor.fetchall() if r[0] is not None]
-
-        not_voted = [u for u in all_users if u not in voted_users]
-
-        projects.append({
-            "project": title,
-            "solution": solution if solution else "",
-            "impact": impact if impact else "",
-            "file": file_path if file_path else "",
-            "total_voters": len(voted_users),
-            "completed": len(voted_users) > 0,
-            "voted_users": voted_users,
-            "not_voted_users": not_voted
-        })
-
-    # ================= USERS ACTIVITY =================
+    # ================= GET VALID USERS =================
     cursor.execute("""
         SELECT username, Names
         FROM dbo.Users
+        WHERE username IS NOT NULL
+          AND LTRIM(RTRIM(username)) <> ''
+          AND username <> 'Admin'
     """)
 
-    users = cursor.fetchall()[:10]
+    user_rows = cursor.fetchall()
 
+    valid_usernames = []
     users_summary = []
 
-    for username, display_name in users:
+    for username, display_name in user_rows:
 
-        if username is None:
+        if not username or username.strip() == '':
             continue
 
-        if display_name is None:
-            display_name = username
+        display_name = display_name if display_name else username
+        valid_usernames.append(username)
 
         cursor.execute("""
             SELECT COUNT(DISTINCT Idea_Title)
@@ -496,6 +462,52 @@ def admin_full_report():
             "remaining": int(remaining)
         })
 
+    # ================= PROJECT STATUS =================
+    cursor.execute("""
+        SELECT AI_Initiative_Title,
+               Summary_of_AI_Solution,
+               Business_Impact_Explanation,
+               FilePath
+        FROM dbo.Initiative
+    """)
+
+    initiatives = cursor.fetchall()
+
+    projects = []
+
+    for title, solution, impact, file_path in initiatives:
+
+        cursor.execute("""
+            SELECT Username, Percentage
+            FROM dbo.FinalVoting
+            WHERE Idea_Title = %s AND Submit = 1
+        """, (title,))
+
+        voted_data = cursor.fetchall()
+
+        voted_users = []
+        user_percentages = {}
+
+        for username, percentage in voted_data:
+            if (
+                username
+                and username.strip() != ''
+                and username != 'Admin'
+            ):
+                voted_users.append(username)
+                user_percentages[username] = float(percentage or 0)
+
+        projects.append({
+            "project": title,
+            "solution": solution if solution else "",
+            "impact": impact if impact else "",
+            "file": file_path if file_path else "",
+            "total_voters": len(voted_users),
+            "completed": len(voted_users) > 0,
+            "voted_users": voted_users,
+            "user_percentages": user_percentages
+        })
+
     conn.close()
 
     return {
@@ -507,4 +519,3 @@ def admin_full_report():
         "projects": projects,
         "users_summary": users_summary
     }
-
