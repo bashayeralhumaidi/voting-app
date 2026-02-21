@@ -380,53 +380,108 @@ def admin_full_report():
     conn = get_connection()
     cursor = conn.cursor()
 
-    # ===== TOTAL PROJECTS =====
-    cursor.execute("SELECT COUNT(*) FROM Initiative")
-    total_projects = cursor.fetchone()[0]
+    # ================= TOTAL PROJECTS (FIXED 39) =================
+    total_projects = 39
 
-    # ===== COMPLETED PROJECTS =====
-    cursor.execute("SELECT COUNT(DISTINCT idea_title) FROM Voting")
-    completed_projects = cursor.fetchone()[0]
+    # ================= COMPLETED PROJECTS =================
+    cursor.execute("SELECT COUNT(DISTINCT Idea_Title) FROM dbo.FinalVoting WHERE Submit = 1")
+    completed_projects = cursor.fetchone()[0] or 0
 
-    # ===== TOTAL USERS =====
-    cursor.execute("SELECT COUNT(*) FROM Users")
-    total_users = cursor.fetchone()[0]
-
-    # ===== TOTAL TEAMS =====
-    cursor.execute("""
-        SELECT COUNT(DISTINCT Team)
-        FROM Initiative
-        WHERE Team IS NOT NULL AND Team <> ''
-    """)
-    total_teams = cursor.fetchone()[0]
-
-    # ===== INDIVIDUAL IDEAS =====
+    # ================= TOTAL TEAMS (Team = 'Yes') =================
     cursor.execute("""
         SELECT COUNT(*)
-        FROM Initiative
-        WHERE Team IS NULL OR Team = ''
+        FROM dbo.Initiative
+        WHERE Team = 'Yes'
     """)
-    individual_ideas = cursor.fetchone()[0]
+    total_teams = cursor.fetchone()[0] or 0
 
-    # ===== COUNTRY DISTRIBUTION =====
+    # ================= INDIVIDUAL IDEAS (Team = 'No') =================
     cursor.execute("""
-        SELECT Country, COUNT(*) as total
-        FROM Initiative
-        WHERE Country IS NOT NULL AND Country <> ''
+        SELECT COUNT(*)
+        FROM dbo.Initiative
+        WHERE Team = 'No'
+    """)
+    individual_ideas = cursor.fetchone()[0] or 0
+
+    # ================= COUNTRY DISTRIBUTION =================
+    cursor.execute("""
+        SELECT Country, COUNT(*)
+        FROM dbo.Initiative
+        WHERE Country IS NOT NULL
         GROUP BY Country
     """)
-    country_data = [
-        {"country": row[0], "count": row[1]}
-        for row in cursor.fetchall()
-    ]
+
+    country_data = []
+    for row in cursor.fetchall():
+        country_data.append({
+            "country": row[0],
+            "count": row[1]
+        })
+
+    # ================= PROJECT STATUS =================
+    cursor.execute("SELECT Names FROM dbo.Users")
+    all_users = [row[0] for row in cursor.fetchall()]
+
+    cursor.execute("SELECT AI_Initiative_Title FROM dbo.Initiative")
+    initiatives = [row[0] for row in cursor.fetchall()]
+
+    projects = []
+
+    for title in initiatives:
+
+        cursor.execute("""
+            SELECT Username
+            FROM dbo.FinalVoting
+            WHERE Idea_Title = %s AND Submit = 1
+        """, (title,))
+        voted_users = [r[0] for r in cursor.fetchall()]
+
+        not_voted = [u for u in all_users if u not in voted_users]
+
+        projects.append({
+            "project": title,
+            "total_voters": len(voted_users),
+            "completed": len(voted_users) > 0,
+            "voted_users": voted_users,
+            "not_voted_users": not_voted
+        })
+
+    # ================= USERS ACTIVITY =================
+    cursor.execute("""
+        SELECT Names
+        FROM dbo.Users
+        WHERE username NOT IN ('Admin','Bashayer')
+    """)
+
+    users = [row[0] for row in cursor.fetchall()][:10]
+
+    users_summary = []
+
+    for user in users:
+
+        cursor.execute("""
+            SELECT COUNT(DISTINCT Idea_Title)
+            FROM dbo.FinalVoting
+            WHERE Username = %s AND Submit = 1
+        """, (user,))
+
+        finished = cursor.fetchone()[0] or 0
+        remaining = total_projects - finished
+
+        users_summary.append({
+            "name": user,
+            "finished": finished,
+            "remaining": remaining
+        })
 
     conn.close()
 
     return {
         "total_projects": total_projects,
         "completed_projects": completed_projects,
-        "total_users": total_users,
         "total_teams": total_teams,
         "individual_ideas": individual_ideas,
         "country_distribution": country_data,
+        "projects": projects,
+        "users_summary": users_summary
     }
