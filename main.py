@@ -380,14 +380,19 @@ def admin_full_report():
     conn = get_connection()
     cursor = conn.cursor()
 
-    # ================= TOTAL PROJECTS (FIXED 39) =================
+    # ================= TOTAL PROJECTS =================
     cursor.execute("SELECT COUNT(*) FROM dbo.Initiative")
     total_projects = cursor.fetchone()[0] or 0
+
     # ================= COMPLETED PROJECTS =================
-    cursor.execute("SELECT COUNT(DISTINCT Idea_Title) FROM dbo.FinalVoting WHERE Submit = 1")
+    cursor.execute("""
+        SELECT COUNT(DISTINCT Idea_Title)
+        FROM dbo.FinalVoting
+        WHERE Submit = 1
+    """)
     completed_projects = cursor.fetchone()[0] or 0
 
-    # ================= TOTAL TEAMS (Team = 'Yes') =================
+    # ================= TOTAL TEAMS =================
     cursor.execute("""
         SELECT COUNT(*)
         FROM dbo.Initiative
@@ -395,7 +400,7 @@ def admin_full_report():
     """)
     total_teams = cursor.fetchone()[0] or 0
 
-    # ================= INDIVIDUAL IDEAS (Team = 'No') =================
+    # ================= INDIVIDUAL IDEAS =================
     cursor.execute("""
         SELECT COUNT(*)
         FROM dbo.Initiative
@@ -414,32 +419,43 @@ def admin_full_report():
     country_data = []
     for row in cursor.fetchall():
         country_data.append({
-            "country": row[0],
-            "count": row[1]
+            "country": row[0] if row[0] else "Unknown",
+            "count": int(row[1])
         })
 
     # ================= PROJECT STATUS =================
-    cursor.execute("SELECT Names FROM dbo.Users")
-    all_users = [row[0] for row in cursor.fetchall()]
+    cursor.execute("SELECT username FROM dbo.Users")
+    all_users = [row[0] for row in cursor.fetchall() if row[0] is not None]
 
-    cursor.execute("SELECT AI_Initiative_Title FROM dbo.Initiative")
-    initiatives = [row[0] for row in cursor.fetchall()]
+    cursor.execute("""
+        SELECT AI_Initiative_Title,
+               Summary_of_AI_Solution,
+               Business_Impact_Explanation,
+               FilePath
+        FROM dbo.Initiative
+    """)
+
+    initiatives = cursor.fetchall()
 
     projects = []
 
-    for title in initiatives:
+    for title, solution, impact, file_path in initiatives:
 
         cursor.execute("""
             SELECT Username
             FROM dbo.FinalVoting
             WHERE Idea_Title = %s AND Submit = 1
         """, (title,))
-        voted_users = [r[0] for r in cursor.fetchall()]
+
+        voted_users = [r[0] for r in cursor.fetchall() if r[0] is not None]
 
         not_voted = [u for u in all_users if u not in voted_users]
 
         projects.append({
             "project": title,
+            "solution": solution if solution else "",
+            "impact": impact if impact else "",
+            "file": file_path if file_path else "",
             "total_voters": len(voted_users),
             "completed": len(voted_users) > 0,
             "voted_users": voted_users,
@@ -448,42 +464,47 @@ def admin_full_report():
 
     # ================= USERS ACTIVITY =================
     cursor.execute("""
-    SELECT username, Names
-    FROM dbo.Users
+        SELECT username, Names
+        FROM dbo.Users
     """)
 
     users = cursor.fetchall()[:10]
-    
+
     users_summary = []
-    
+
     for username, display_name in users:
-    
+
+        if username is None:
+            continue
+
+        if display_name is None:
+            display_name = username
+
         cursor.execute("""
             SELECT COUNT(DISTINCT Idea_Title)
             FROM dbo.FinalVoting
             WHERE Username = %s AND Submit = 1
         """, (username,))
-    
+
         finished = cursor.fetchone()[0] or 0
         remaining = total_projects - finished
-    
+
         users_summary.append({
-            "name": display_name,   # show full name
-            "username": username,   # keep login username
-            "finished": finished,
-            "remaining": remaining
+            "name": str(display_name),
+            "username": str(username),
+            "finished": int(finished),
+            "remaining": int(remaining)
         })
 
     conn.close()
 
     return {
-        "total_projects": total_projects,
-        "completed_projects": completed_projects,
-        "total_teams": total_teams,
-        "individual_ideas": individual_ideas,
+        "total_projects": int(total_projects),
+        "completed_projects": int(completed_projects),
+        "total_teams": int(total_teams),
+        "individual_ideas": int(individual_ideas),
         "country_distribution": country_data,
         "projects": projects,
         "users_summary": users_summary
     }
-
 
