@@ -476,38 +476,46 @@ def admin_full_report():
     projects = []
 
     for title, solution, impact, file_path in initiatives:
-
+    
         cursor.execute("""
             SELECT Username, Percentage
             FROM dbo.FinalVoting
             WHERE Idea_Title = %s AND Submit = 1
         """, (title,))
-
+    
         voted_data = cursor.fetchall()
-
+    
         voted_users = []
         user_percentages = {}
-
+    
         for username, percentage in voted_data:
-            if (
-                username
-                and username.strip() != ''
-                and username != 'Admin'
-            ):
+            if username and username.strip() != '' and username != 'Admin':
                 voted_users.append(username)
                 user_percentages[username] = float(percentage or 0)
-
+    
+        # Calculate average
+        avg = 0
+        if user_percentages:
+            avg = sum(user_percentages.values()) / len(user_percentages)
+    
         projects.append({
             "project": title,
             "solution": solution if solution else "",
             "impact": impact if impact else "",
             "file": file_path if file_path else "",
             "total_voters": len(voted_users),
-            "completed": len(voted_users) > 0,
+            "average_percentage": round(avg, 2),
             "voted_users": voted_users,
             "user_percentages": user_percentages
         })
-
+    
+    # 🔥 Sort by average descending (Ranking)
+    projects.sort(key=lambda x: x["average_percentage"], reverse=True)
+    
+    # Add rank
+    for index, p in enumerate(projects):
+        p["rank"] = index + 1
+                  
     conn.close()
 
     return {
@@ -519,3 +527,4 @@ def admin_full_report():
         "projects": projects,
         "users_summary": users_summary
     }
+
