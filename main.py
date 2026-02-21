@@ -448,28 +448,28 @@ def admin_full_report():
 
     # ================= USERS ACTIVITY =================
     cursor.execute("""
-        SELECT Names
-        FROM dbo.Users
-        WHERE username NOT IN ('Admin','Bashayer')
+    SELECT username, Names
+    FROM dbo.Users
     """)
 
-    users = [row[0] for row in cursor.fetchall()][:10]
-
+    users = cursor.fetchall()[:10]
+    
     users_summary = []
-
-    for user in users:
-
+    
+    for username, display_name in users:
+    
         cursor.execute("""
             SELECT COUNT(DISTINCT Idea_Title)
             FROM dbo.FinalVoting
             WHERE Username = %s AND Submit = 1
-        """, (user,))
-
+        """, (username,))
+    
         finished = cursor.fetchone()[0] or 0
         remaining = total_projects - finished
-
+    
         users_summary.append({
-            "name": user,
+            "name": display_name,   # show full name
+            "username": username,   # keep login username
             "finished": finished,
             "remaining": remaining
         })
@@ -485,4 +485,5 @@ def admin_full_report():
         "projects": projects,
         "users_summary": users_summary
     }
+
 
