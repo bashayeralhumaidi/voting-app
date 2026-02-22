@@ -6,5 +6,7 @@ def get_connection():
         server=os.environ["DB_SERVER"],
         user=os.environ["DB_USER"],
         password=os.environ["DB_PASSWORD"],
-        database=os.environ["DB_NAME"]
+        database=os.environ["DB_NAME"],
+        charset="UTF-8"
     )
+
