@@ -228,16 +228,17 @@ def check_final_vote(username: str, idea_title: str):
 # ==============================
 # ADMIN FULL REPORT
 # ==============================
-
 @app.get("/admin/full_report")
 def admin_full_report():
 
     conn = get_connection()
     cursor = conn.cursor()
 
+    # ================= TOTAL PROJECTS =================
     cursor.execute("SELECT COUNT(*) FROM dbo.Initiative")
     total_projects = cursor.fetchone()[0] or 0
 
+    # ================= COMPLETED PROJECTS =================
     cursor.execute("""
         SELECT COUNT(DISTINCT CAST(Idea_Title AS NVARCHAR(MAX)))
         FROM dbo.FinalVoting
@@ -245,7 +246,39 @@ def admin_full_report():
     """)
     completed_projects = cursor.fetchone()[0] or 0
 
-    # USERS
+    # ================= TOTAL TEAMS =================
+    cursor.execute("""
+        SELECT COUNT(*)
+        FROM dbo.Initiative
+        WHERE Team = 'Yes'
+    """)
+    total_teams = cursor.fetchone()[0] or 0
+
+    # ================= INDIVIDUAL IDEAS =================
+    cursor.execute("""
+        SELECT COUNT(*)
+        FROM dbo.Initiative
+        WHERE Team = 'No'
+    """)
+    individual_ideas = cursor.fetchone()[0] or 0
+
+    # ================= COUNTRY DISTRIBUTION =================
+    cursor.execute("""
+        SELECT Country, COUNT(*)
+        FROM dbo.Initiative
+        WHERE Country IS NOT NULL
+          AND LTRIM(RTRIM(Country)) <> ''
+        GROUP BY Country
+    """)
+
+    country_data = []
+    for row in cursor.fetchall():
+        country_data.append({
+            "country": str(row[0]),
+            "count": int(row[1])
+        })
+
+    # ================= USERS =================
     cursor.execute("""
         SELECT username, Names
         FROM dbo.Users
@@ -256,11 +289,8 @@ def admin_full_report():
 
     user_rows = cursor.fetchall()
     users_summary = []
-    valid_usernames = []
 
     for username, display_name in user_rows:
-
-        valid_usernames.append(username)
 
         cursor.execute("""
             SELECT COUNT(DISTINCT CAST(Idea_Title AS NVARCHAR(MAX)))
@@ -277,7 +307,7 @@ def admin_full_report():
             "remaining": int(total_projects - finished)
         })
 
-    # PROJECTS
+    # ================= PROJECTS =================
     cursor.execute("""
         SELECT 
             CAST(AI_Initiative_Title AS NVARCHAR(MAX)),
@@ -323,16 +353,20 @@ def admin_full_report():
             "user_percentages": user_percentages
         })
 
+    # ================= RANKING =================
     projects.sort(key=lambda x: x["average_percentage"], reverse=True)
 
-    for i, p in enumerate(projects):
-        p["rank"] = i + 1
+    for index, p in enumerate(projects):
+        p["rank"] = index + 1
 
     conn.close()
 
     return {
         "total_projects": int(total_projects),
         "completed_projects": int(completed_projects),
+        "total_teams": int(total_teams),
+        "individual_ideas": int(individual_ideas),
+        "country_distribution": country_data,
         "projects": projects,
         "users_summary": users_summary
     }
