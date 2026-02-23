@@ -9,7 +9,7 @@ app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://kind-flower-0e4bd1b03.6.azurestaticapps.net"
+        "https://kind-flower-0e4bd1b03.6.azurestaticapps.net",
     ],
     allow_origin_regex=r"http://localhost:\d+",
     allow_credentials=True,
@@ -369,5 +369,6 @@ def admin_full_report():
         "projects": projects,
         "users_summary": users_summary
     }
+
 
 
