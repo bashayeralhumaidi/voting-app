@@ -223,7 +223,54 @@ def check_final_vote(username: str, idea_title: str):
     conn.close()
 
     return {"submitted": bool(row[0]) if row else False}
+# ==============================
+# CHANGE PASSWORD
+# ==============================
+@app.post("/change_password")
+def change_password(data: ChangePasswordModel):
 
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    # Get current password
+    cursor.execute("""
+        SELECT password
+        FROM dbo.Users
+        WHERE LTRIM(RTRIM(CAST(username AS NVARCHAR(MAX)))) = LTRIM(RTRIM(%s))
+    """, (data.username.strip(),))
+
+    row = cursor.fetchone()
+
+    if not row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="User not found")
+
+    stored_password = row[0].strip()
+
+    # Check old password
+    if stored_password.startswith("$2"):
+        if not bcrypt.checkpw(data.old_password.encode(), stored_password.encode()):
+            conn.close()
+            raise HTTPException(status_code=401, detail="Old password incorrect")
+    else:
+        if stored_password != data.old_password:
+            conn.close()
+            raise HTTPException(status_code=401, detail="Old password incorrect")
+
+    # Hash new password
+    hashed = bcrypt.hashpw(data.new_password.encode(), bcrypt.gensalt()).decode()
+
+    # Update password
+    cursor.execute("""
+        UPDATE dbo.Users
+        SET password = %s
+        WHERE LTRIM(RTRIM(CAST(username AS NVARCHAR(MAX)))) = LTRIM(RTRIM(%s))
+    """, (hashed, data.username.strip()))
+
+    conn.commit()
+    conn.close()
+
+    return {"success": True}
 
 # ==============================
 # ADMIN FULL REPORT
@@ -370,6 +417,7 @@ def admin_full_report():
         "projects": projects,
         "users_summary": users_summary
     }
+
 
 
 
