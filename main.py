@@ -31,6 +31,7 @@ class VoteModel(BaseModel):
     username: str
     category: str
     score: int
+    comment: str | None = None
 
 class FinalVoteModel(BaseModel):
     username: str
@@ -136,13 +137,14 @@ def submit_vote(vote: VoteModel):
 
     cursor.execute("""
         INSERT INTO dbo.Voting
-        (Idea_Title, username, Category, Score)
-        VALUES (%s, %s, %s, %s)
+        (Idea_Title, username, Category, Score, Comment)
+        VALUES (%s, %s, %s, %s, %s)
     """, (
         vote.idea_title.strip(),
         vote.username.strip(),
         vote.category,
-        vote.score
+        vote.score,
+        vote.comment.strip() if vote.comment else None
     ))
 
     conn.commit()
@@ -417,6 +419,7 @@ def admin_full_report():
         "projects": projects,
         "users_summary": users_summary
     }
+
 
 
 
