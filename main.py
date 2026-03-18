@@ -10,7 +10,6 @@ app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://kind-flower-0e4bd1b03.azurestaticapps.net",
         "https://kind-flower-0e4bd1b03.6.azurestaticapps.net",
     ],
     allow_credentials=True,
