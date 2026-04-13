@@ -134,17 +134,51 @@ def submit_vote(vote: VoteModel):
     conn = get_connection()
     cursor = conn.cursor()
 
+    trimmed_title = vote.idea_title.strip()
+    trimmed_username = vote.username.strip()
+    trimmed_comment = vote.comment.strip() if vote.comment else None
+
     cursor.execute("""
-        INSERT INTO dbo.Voting
-        (Idea_Title, username, Category, Score, Comment)
-        VALUES (%s, %s, %s, %s, %s)
+        SELECT COUNT(*)
+        FROM dbo.Voting
+        WHERE LTRIM(RTRIM(CAST(Idea_Title AS NVARCHAR(MAX)))) = LTRIM(RTRIM(%s))
+          AND LTRIM(RTRIM(CAST(username AS NVARCHAR(MAX)))) = LTRIM(RTRIM(%s))
+          AND LTRIM(RTRIM(CAST(Category AS NVARCHAR(MAX)))) = LTRIM(RTRIM(%s))
     """, (
-        vote.idea_title.strip(),
-        vote.username.strip(),
+        trimmed_title,
+        trimmed_username,
         vote.category,
-        vote.score,
-        vote.comment.strip() if vote.comment else None
     ))
+
+    existing_vote = cursor.fetchone()[0] or 0
+
+    if existing_vote:
+        cursor.execute("""
+            UPDATE dbo.Voting
+            SET Score = %s,
+                Comment = %s
+            WHERE LTRIM(RTRIM(CAST(Idea_Title AS NVARCHAR(MAX)))) = LTRIM(RTRIM(%s))
+              AND LTRIM(RTRIM(CAST(username AS NVARCHAR(MAX)))) = LTRIM(RTRIM(%s))
+              AND LTRIM(RTRIM(CAST(Category AS NVARCHAR(MAX)))) = LTRIM(RTRIM(%s))
+        """, (
+            vote.score,
+            trimmed_comment,
+            trimmed_title,
+            trimmed_username,
+            vote.category,
+        ))
+    else:
+        cursor.execute("""
+            INSERT INTO dbo.Voting
+            (Idea_Title, username, Category, Score, Comment)
+            VALUES (%s, %s, %s, %s, %s)
+        """, (
+            trimmed_title,
+            trimmed_username,
+            vote.category,
+            vote.score,
+            trimmed_comment
+        ))
 
     conn.commit()
     conn.close()
@@ -186,16 +220,46 @@ def submit_final_vote(data: FinalVoteModel):
     conn = get_connection()
     cursor = conn.cursor()
 
+    trimmed_username = data.username.strip()
+    trimmed_title = data.idea_title.strip()
+    submit_value = 1 if data.submit else 0
+
     cursor.execute("""
-        INSERT INTO dbo.FinalVoting
-        (Username, Idea_Title, Percentage, Submit)
-        VALUES (%s, %s, %s, %s)
+        SELECT COUNT(*)
+        FROM dbo.FinalVoting
+        WHERE LTRIM(RTRIM(CAST(Username AS NVARCHAR(MAX)))) = LTRIM(RTRIM(%s))
+          AND LTRIM(RTRIM(CAST(Idea_Title AS NVARCHAR(MAX)))) = LTRIM(RTRIM(%s))
     """, (
-        data.username.strip(),
-        data.idea_title.strip(),
-        data.percentage,
-        1 if data.submit else 0
+        trimmed_username,
+        trimmed_title,
     ))
+
+    existing_vote = cursor.fetchone()[0] or 0
+
+    if existing_vote:
+        cursor.execute("""
+            UPDATE dbo.FinalVoting
+            SET Percentage = %s,
+                Submit = %s
+            WHERE LTRIM(RTRIM(CAST(Username AS NVARCHAR(MAX)))) = LTRIM(RTRIM(%s))
+              AND LTRIM(RTRIM(CAST(Idea_Title AS NVARCHAR(MAX)))) = LTRIM(RTRIM(%s))
+        """, (
+            data.percentage,
+            submit_value,
+            trimmed_username,
+            trimmed_title,
+        ))
+    else:
+        cursor.execute("""
+            INSERT INTO dbo.FinalVoting
+            (Username, Idea_Title, Percentage, Submit)
+            VALUES (%s, %s, %s, %s)
+        """, (
+            trimmed_username,
+            trimmed_title,
+            data.percentage,
+            submit_value
+        ))
 
     conn.commit()
     conn.close()
@@ -214,7 +278,7 @@ def check_final_vote(username: str, idea_title: str):
     cursor = conn.cursor()
 
     cursor.execute("""
-        SELECT Submit
+        SELECT MAX(CAST(Submit AS INT))
         FROM dbo.FinalVoting
         WHERE LTRIM(RTRIM(CAST(Username AS NVARCHAR(MAX)))) = LTRIM(RTRIM(%s))
           AND LTRIM(RTRIM(CAST(Idea_Title AS NVARCHAR(MAX)))) = LTRIM(RTRIM(%s))
@@ -224,6 +288,49 @@ def check_final_vote(username: str, idea_title: str):
     conn.close()
 
     return {"submitted": bool(row[0]) if row else False}
+
+
+@app.get("/get_user_vote/{username}/{idea_title}")
+def get_user_vote(username: str, idea_title: str):
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT
+            CAST(Category AS NVARCHAR(MAX)),
+            Score,
+            CAST(Comment AS NVARCHAR(MAX))
+        FROM dbo.Voting
+        WHERE LTRIM(RTRIM(CAST(username AS NVARCHAR(MAX)))) = LTRIM(RTRIM(%s))
+          AND LTRIM(RTRIM(CAST(Idea_Title AS NVARCHAR(MAX)))) = LTRIM(RTRIM(%s))
+    """, (username, idea_title))
+
+    votes = []
+    for category, score, comment in cursor.fetchall():
+        votes.append({
+            "category": str(category or ""),
+            "score": int(score or 0),
+            "comment": str(comment or "")
+        })
+
+    cursor.execute("""
+        SELECT
+            MAX(CAST(Submit AS INT)),
+            MAX(Percentage)
+        FROM dbo.FinalVoting
+        WHERE LTRIM(RTRIM(CAST(Username AS NVARCHAR(MAX)))) = LTRIM(RTRIM(%s))
+          AND LTRIM(RTRIM(CAST(Idea_Title AS NVARCHAR(MAX)))) = LTRIM(RTRIM(%s))
+    """, (username, idea_title))
+
+    final_vote = cursor.fetchone()
+    conn.close()
+
+    return {
+        "submitted": bool(final_vote[0]) if final_vote else False,
+        "percentage": float(final_vote[1] or 0) if final_vote else 0,
+        "votes": votes
+    }
 # ==============================
 # CHANGE PASSWORD
 # ==============================
